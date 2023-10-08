@@ -24,7 +24,7 @@ class UOSRobotics:
         self.zeus.move_pick()
         
         while True:
-                        
+            
             # Predict grasp pose
             depth_frame, color_frame, pc = self.camera1.get_frame()
             grasp_pose = self.grasp.predict_grasp(depth_frame, color_frame, pc)
@@ -92,9 +92,7 @@ class UOSRobotics:
             self.zeus.move(obj_pose)
             self.zeus.place()
             
-            #
-            # Smoothly move to first place code
-            #            
+
             
         # Close connection
         self.zeus.close()
