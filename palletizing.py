@@ -63,21 +63,18 @@ class Palletizing:
     def after_depth_map(self, len1, len2):
         start_time = time.time()
         
-        depth_map = self.before_depth_map
-        
-        max_len = max(len1, len2)
-        min_len = min(len1, len2)   
+        depth_map = self.before_depth_map.copy()
 
         find_flag = False
         h, w = depth_map.shape
         min_height = float('inf')
-        std_map = np.ones((h-min_len, w-max_len))
+        std_map = np.ones((h-len1, w-len2))
         
         # Find plane with size of object
-        for i in range (h - min_len):
+        for i in range (h - len1):
             
-            for j in range (w - max_len):
-                tmp_map = depth_map[i:i+min_len, j:j+max_len]
+            for j in range (w - len2):
+                tmp_map = depth_map[i:i+len1, j:j+len2]
                 std_map[i, j] = np.std(tmp_map)
                 
                 # Find plane
@@ -94,7 +91,7 @@ class Palletizing:
             min_idx = np.unravel_index(min_std_idx, std_map.shape)          
             print('perfect plane is not found, alternative idx find')        
 
-        depth_map[min_idx[0]:min_idx[0]+min_len, min_idx[1]:min_idx[1]+max_len] = self.h_max
+        depth_map[min_idx[0]:min_idx[0]+len1, min_idx[1]:min_idx[1]+len2] += self.h_max
         self.after_depth_map = depth_map
 
         end_time = time.time()
@@ -105,7 +102,7 @@ class Palletizing:
         #
     
     def visualization_depth_map(self, flag):
-        
+            
         # Set the size of the plotting window
         plt.figure(figsize=(10, 5))
 
@@ -119,15 +116,19 @@ class Palletizing:
         elif flag == 2:
             self.axes[0].set_title("Result Depth Map")
         
-        # Adding the colorbar only once
-        if not hasattr(self, 'color_bar'):  # Add colorbar only on the first run
-            self.color_bar = plt.colorbar(self.before_img, ax=self.axes[0], orientation='vertical')
+        # Adding the colorbar for Before Depth Map
+        if not hasattr(self, 'color_bar_before'):  # Add colorbar only on the first run
+            self.color_bar_before = plt.colorbar(self.before_img, ax=self.axes[0], orientation='vertical')
 
         # Visualizing After Depth Map
         if hasattr(self, 'after_img') and self.after_img:  # Check if after_img exists
             self.after_img.remove()
         self.after_img = self.axes[1].imshow(self.after_depth_map, cmap='jet')
         self.axes[1].set_title("After Place Depth Map")
+
+        # Adding the colorbar for After Depth Map
+        if not hasattr(self, 'color_bar_after'):  # Add colorbar only on the first run
+            self.color_bar_after = plt.colorbar(self.after_img, ax=self.axes[1], orientation='vertical')
 
         plt.draw()
         plt.pause(0.01)  # Gives a moment for the plots to update

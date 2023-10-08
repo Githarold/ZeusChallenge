@@ -105,6 +105,7 @@ class UOSRobotics:
             self.pack.visualization_depth_map(flag = 2)
 
         # Close connection
+        self.zeus.send_data(-1, "finish")
         self.zeus.close()
 
         # Camera pipline stop

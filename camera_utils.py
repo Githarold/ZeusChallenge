@@ -76,7 +76,7 @@ class FrameCapture:
     def get_pcd(self, depth_frame, color_frame, flag):
         
         depths = np.asanyarray(depth_frame.get_data())
-        colors = np.asanyarray(color_frame.get_data())        
+        colors = np.asanyarray(color_frame.get_data())
 
         points = self.pc.calculate(depth_frame)
 
@@ -89,9 +89,9 @@ class FrameCapture:
         points_z = depths / 1000.0
         
         if (flag == 'object'):
-            zmin, zmax = 0.1, 0.3
+            zmin, zmax = 0.36, 0.56
         elif (flag == 'depth'):
-            zmin, zmax = 0.2, 0.4
+            zmin, zmax = 0.32, 0.54
         
         # remove outlier
         mask = (points_z > zmin) & (points_z < zmax)
