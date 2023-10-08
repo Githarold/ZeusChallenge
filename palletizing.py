@@ -15,9 +15,20 @@ class Palletizing:
         self.h_max = 16/3
         self.real_x, self.real_y, self.real_z = 41, 29, 16
         
-        # Initializing depth maps
+        # Initializing other values
         self.before_depth_map = None
         self.after_depth_map = None
+        self.min_idx = (0, 0)
+        self.place_h = 0
+        self.x_min = 0.0
+        self.x_max = 0.0
+        self.y_min = 0.0
+        self.y_max = 0.0
+        self.z_min = 0.0
+        self.z_max = 0.0
+        self.res_x = 0.0
+        self.res_y = 0.0
+        self.res_z = 0.0
         
         # Initializing figure
         self.fig, self.axes = plt.subplots(2, 1, figsize=(10, 5))
@@ -25,43 +36,75 @@ class Palletizing:
         self.before_img = None
         self.after_img = None
         
-    def before_depth_map(self, pcd):
-        
+    # Optimize function        
+    def make_before_depth_map(self, pcd):
         points = np.asarray(pcd.points)
 
-        x_min, x_max = np.min(points[:, 0]), np.max(points[:, 0])
-        y_min, y_max = np.min(points[:, 1]), np.max(points[:, 1])
-        z_min, z_max = np.min(points[:, 2]), np.max(points[:, 2])
-        
-        # Set origin        
+        x_min = np.min(points[:, 0])
+        y_min = np.min(points[:, 1])
+        z_max = np.max(points[:, 2])
+
         points[:, 0] -= x_min
         points[:, 1] -= y_min
         points[:, 2] = z_max - points[:, 2]
 
         # Update min, max
-        x_min, x_max = np.min(points[:, 0]), np.max(points[:, 0])
-        y_min, y_max = np.min(points[:, 1]), np.max(points[:, 1])
-        z_min, z_max = np.min(points[:, 2]), np.max(points[:, 2])
+        self.x_min, self.x_max = np.min(points[:, 0]), np.max(points[:, 0])
+        self.y_min, self.y_max = np.min(points[:, 1]), np.max(points[:, 1])
+        self.z_min, self.z_max = np.min(points[:, 2]), np.max(points[:, 2])
+
+        self.res_x = self.real_x / (self.x_max - self.x_min) / self.cell_size
+        self.res_y = self.real_y / (self.y_max - self.y_min) / self.cell_size
+        self.res_z = self.real_z / (self.z_max - self.z_min) / self.z_cell_size
+
+        i_values = (points[:, 1] * self.res_y - 1).astype(int)
+        j_values = (points[:, 0] * self.res_x - 1).astype(int)
+        z_values = np.round(points[:, 2] * self.res_z)
+
+        # Assuming the depth map has already been initialized to the proper size and filled with z_min
+        for i, j, z in zip(i_values, j_values, z_values):
+            self.before_depth_map[i, j] = max(self.before_depth_map[i, j], z)        
         
-        res_x = self.real_x/(x_max - x_min)/self.cell_size
-        res_y = self.real_y/(y_max - y_min)/self.cell_size
-        res_z = self.real_z/(z_max - z_min)/self.z_cell_size
+    # def make_before_depth_map(self, pcd):
         
-        width = int(np.ceil((x_max - x_min) * res_x))
-        length = int(np.ceil((y_max - y_min) * res_y))
+    #     points = np.asarray(pcd.points)
+
+    #     x_min = np.min(points[:, 0])
+    #     y_min = np.min(points[:, 1])
+    #     z_min, z_max = np.min(points[:, 2]), np.max(points[:, 2])
         
-        # Make depth map
-        self.before_depth_map = np.full((length, width), z_min) 
+    #     # Set origin
+    #     points[:, 0] -= x_min
+    #     points[:, 1] -= y_min
+    #     points[:, 2] = z_max - points[:, 2]
+
+    #     # Update min, max
+    #     self.x_min, self.x_max = np.min(points[:, 0]), np.max(points[:, 0])
+    #     self.y_min, self.y_max = np.min(points[:, 1]), np.max(points[:, 1])
+    #     self.z_min, self.z_max = np.min(points[:, 2]), np.max(points[:, 2])
         
-        # Pointcloud to Matrix mapping
-        for point in points:
-            x, y, z = point
-            i = int(y * res_y - 1)
-            j = int(x * res_x - 1)
-            self.before_depth_map[i, j] = max(self.before_depth_map[i, j], np.round(z*res_z))
+    #     self.res_x = self.real_x/(self.x_max - self.x_min)/self.cell_size
+    #     self.res_y = self.real_y/(self.y_max - self.y_min)/self.cell_size
+    #     self.res_z = self.real_z/(self.z_max - self.z_min)/self.z_cell_size
+        
+    #     width = int(np.ceil((self.x_max - self.x_min) * self.res_x))
+    #     length = int(np.ceil((self.y_max - self.y_min) * self.res_y))
+        
+    #     # Make depth map
+    #     self.before_depth_map = np.full((length, width), self.z_min)
+        
+    #     # Pointcloud to Matrix mapping
+    #     for point in points:
+    #         x, y, z = point
+    #         i = int(y * self.res_y - 1)
+    #         j = int(x * self.res_x - 1)
+    #         self.before_depth_map[i, j] = max(self.before_depth_map[i, j], np.round(z*self.res_z))
                     
-    def after_depth_map(self, len1, len2):
+    def make_after_depth_map(self, len1, len2):
         start_time = time.time()
+        
+        self.len1 = len1
+        self.len2 = len2
         
         depth_map = self.before_depth_map.copy()
 
@@ -83,23 +126,40 @@ class Palletizing:
                     
                     if depth_map[i, j] <= min_height:
                         min_height = depth_map[i, j]
-                        min_idx = (i, j)
+                        self.min_idx = (i, j)
+                        self.place_h = depth_map[i, j]
         
         # Not found
         if not find_flag:
             min_std_idx = np.argmin(std_map)
-            min_idx = np.unravel_index(min_std_idx, std_map.shape)          
-            print('perfect plane is not found, alternative idx find')        
+            self.min_idx = np.unravel_index(min_std_idx, std_map.shape)          
+            print('perfect plane is not found, alternative position find')        
 
-        depth_map[min_idx[0]:min_idx[0]+len1, min_idx[1]:min_idx[1]+len2] += self.h_max
+        depth_map[self.min_idx[0]:self.min_idx[0]+len1, self.min_idx[1]:self.min_idx[1]+len2] += self.h_max
         self.after_depth_map = depth_map
 
         end_time = time.time()
         print(f"Calculate time : {end_time - start_time} seconds")
+    
+    def matrix_to_absolute_coordinate(self):
         
-        #
-        # need to make min_idx to position (x, y) & return position
-        #
+        i = self.min_idx[0] + self.len1/2.0
+        j = self.min_idx[1] + self.len2/2.0
+        
+        # Convert matrix 'i' index to actual 'y' coordinate
+        y = (i + 1) / self.res_y + self.y_min
+        
+        # Convert matrix 'j' index to actual 'x' coordinate
+        x = (j + 1) / self.res_x + self.x_min
+        
+        # Convert the depth_value to 'z' coordinate considering the resolution
+        z = self.place_h / self.res_z
+        
+        # Restore the original z coordinate by subtracting from z_max
+        z = self.z_max - z
+        
+        return x, y, z
+
     
     def visualization_depth_map(self, flag):
             

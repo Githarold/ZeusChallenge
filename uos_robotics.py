@@ -20,12 +20,12 @@ class UOSRobotics:
 
     def run(self):
         
-        self.zeus.move_place()
+        self.zeus.move_depth()
         
         # Make Initial depth map
         depth_frame, color_frame, _ = self.camera1.get_frame()
         depth_pcd = self.camera1.get_pcd(depth_frame, color_frame, flag = 'depth')
-        self.pack.before_depth_map(depth_pcd)
+        self.pack.make_before_depth_map(depth_pcd)
                 
         while True:
             
@@ -46,7 +46,6 @@ class UOSRobotics:
                 self.miss_stack += 1
                 
                 if self.miss_stack > 3:
-                    print('Program done')
                     break
                 
                 else:
@@ -66,16 +65,15 @@ class UOSRobotics:
             # Move to fixed camera
             self.zeus.move_pose_estimation()
                         
-            # Use YOLO, Check object. If there's not object, Move to first place
-            _, color_frame, _ = self.camera2.get_frame()
-            detected_obj = self.yolo.detect(color_frame)
+            # Object 2D pose, shape detect
+            depth_frame, color_frame, _ = self.camera2.get_frame()
             
+            detected_obj = self.yolo.detect(color_frame)            
+            # Use YOLO, Check object. If there's not object, Move to first place            
             if not detected_obj:
                 # Restart loop
                 continue
-                        
-            # Object 2D pose, shape detect
-            depth_frame, color_frame, _ = self.camera2.get_frame()
+            
             obj_pcd = self.camera2.get_pcd(depth_frame, color_frame, flag = 'object')
 
             self.object.estimate_plane(obj_pcd)
@@ -83,25 +81,24 @@ class UOSRobotics:
             len1, len2 = self.object.estimate_length()
 
             # Make depth map & visualization
-            self.pack.after_depth_map(len1, len2)
+            self.pack.make_after_depth_map(len1, len2)
             self.pack.visualization_depth_map(flag = 1)
-
-            #
-            # object_pose to place pose code
-            #
+            
+            # Depth map to absolute x, y, z
+            place_x, place_y, place_z = self.pack.matrix_to_absolute_coordinate()
             
             # Move object to box & Place
-            self.zeus.move(obj_pose)        # need to change
-            self.zeus.place()
+            self.zeus.move_only_position(place_x, place_y)
+            self.zeus.place(place_z)
             
             # Move to above the box
-            self.zeus.move_place()          # need to change
+            self.zeus.move_depth()
             
             depth_frame, color_frame, _ = self.camera1.get_frame()
             depth_pcd = self.camera1.get_pcd(depth_frame, color_frame, flag = 'depth')       # Multi threding?     
             
             # Make depth map & visualization
-            self.pack.before_depth_map(depth_pcd)                                            #
+            self.pack.make_before_depth_map(depth_pcd)                                            #
             self.pack.visualization_depth_map(flag = 2)
 
         # Close connection
