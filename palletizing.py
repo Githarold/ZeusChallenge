@@ -100,18 +100,24 @@ class Palletizing:
     
     def visualization_depth_map(self):
         
-        # Before Depth Map Visualization
-        if self.before_img:
+        # Set the size of the plotting window
+        plt.figure(figsize=(10, 5))
+
+        # Visualizing Before Depth Map
+        if hasattr(self, 'before_img') and self.before_img:  # Check if before_img exists
             self.before_img.remove()
         self.before_img = self.axes[0].imshow(self.before_depth_map, cmap='jet')
         self.axes[0].set_title("Before Place Depth Map")
         
-        # After Depth Map Visualization
-        if self.after_img:
+        # Adding the colorbar only once
+        if not hasattr(self, 'color_bar'):  # Add colorbar only on the first run
+            self.color_bar = plt.colorbar(self.before_img, ax=self.axes[0], orientation='vertical')
+
+        # Visualizing After Depth Map
+        if hasattr(self, 'after_img') and self.after_img:  # Check if after_img exists
             self.after_img.remove()
         self.after_img = self.axes[1].imshow(self.after_depth_map, cmap='jet')
         self.axes[1].set_title("After Place Depth Map")
-        
+
         plt.draw()
-        plt.pause(0.01)  # Allow a moment for the plots to update        
-        
+        plt.pause(0.01)  # Gives a moment for the plots to update
