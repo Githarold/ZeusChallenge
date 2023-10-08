@@ -20,18 +20,24 @@ class UOSRobotics:
 
     def run(self):
         
-        # Move to place to grasp object detect
-        self.zeus.move_pick()
+        self.zeus.move_place()
         
+        # Make Initial depth map
+        depth_frame, color_frame, _ = self.camera1.get_frame()
+        depth_pcd = self.camera1.get_pcd(depth_frame, color_frame, flag = 'depth')
+        self.pack.before_depth_map(depth_pcd)
+                
         while True:
+            
+            # Move to place to grasp object detect
+            if self.miss_stack == 0:
+                self.zeus.move_pick()
+            else:
+                pass
             
             # Predict grasp pose
             depth_frame, color_frame, pc = self.camera1.get_frame()
             grasp_pose = self.grasp.predict_grasp(depth_frame, color_frame, pc)
-            
-            #
-            # grasp_pose to robot base code
-            #
             
             # Yolo detect to know object is exist
             detected_obj = self.yolo.detect(color_frame)
@@ -49,6 +55,10 @@ class UOSRobotics:
             else:
                 self.miss_stack = 0
                 
+            #
+            # grasp_pose to robot base code
+            #
+
             # Move to object & Pick
             self.zeus.move(grasp_pose)      # need to change
             self.zeus.pick()
@@ -61,39 +71,39 @@ class UOSRobotics:
             detected_obj = self.yolo.detect(color_frame)
             
             if not detected_obj:
-                # Move to first place
-                self.zeus.move_pick()
+                # Restart loop
                 continue
                         
             # Object 2D pose, shape detect
             depth_frame, color_frame, _ = self.camera2.get_frame()
-            pose_pcd = self.camera2.get_pcd(depth_frame, color_frame, flag = 'object')
+            obj_pcd = self.camera2.get_pcd(depth_frame, color_frame, flag = 'object')
 
-            self.object.estimate_plane(pose_pcd)
+            self.object.estimate_plane(obj_pcd)
             obj_pose = self.object.estimate_pose()
             len1, len2 = self.object.estimate_length()
-            
-            # Move to above the box
-            self.zeus.move_place()
-            
-            depth_frame, color_frame, _ = self.camera1.get_frame()
-            depth_pcd = self.camera1.get_pcd(depth_frame, color_frame, flag = 'depth')
-            
+
             # Make depth map & visualization
-            self.pack.before_depth_map(depth_pcd)
             self.pack.after_depth_map(len1, len2)
-            self.pack.visualization_depth_map()
+            self.pack.visualization_depth_map(flag = 1)
 
             #
             # object_pose to place pose code
             #
             
             # Move object to box & Place
-            self.zeus.move(obj_pose)
+            self.zeus.move(obj_pose)        # need to change
             self.zeus.place()
             
-
+            # Move to above the box
+            self.zeus.move_place()          # need to change
             
+            depth_frame, color_frame, _ = self.camera1.get_frame()
+            depth_pcd = self.camera1.get_pcd(depth_frame, color_frame, flag = 'depth')       # Multi threding?     
+            
+            # Make depth map & visualization
+            self.pack.before_depth_map(depth_pcd)                                            #
+            self.pack.visualization_depth_map(flag = 2)
+
         # Close connection
         self.zeus.close()
 

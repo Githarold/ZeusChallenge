@@ -24,16 +24,17 @@ class FrameCapture:
         pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
         pipeline_profile = self.config.resolve(pipeline_wrapper)
 
-        device = pipeline_profile.get_device()
+        # device = pipeline_profile.get_device()
 
-        found_rgb = False
-        for s in device.sensors:
-            if s.get_info(rs.camera_info.name) == 'RGB Camera':
-                found_rgb = True
-                break
-        if not found_rgb:
-            print("The demo requires Depth camera with Color sensor")
-            exit(0)
+        # found_rgb = False
+        # for s in device.sensors:
+        #     if s.get_info(rs.camera_info.name) == 'RGB Camera':
+        #         found_rgb = True
+        #         break
+            
+        # if not found_rgb:
+        #     print("The project requires Depth camera with Color sensor")
+        #     exit(0)
 
         self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)

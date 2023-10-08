@@ -19,6 +19,12 @@ class Palletizing:
         self.before_depth_map = None
         self.after_depth_map = None
         
+        # Initializing figure
+        self.fig, self.axes = plt.subplots(2, 1, figsize=(10, 5))
+        plt.close(self.fig)
+        self.before_img = None
+        self.after_img = None
+        
     def before_depth_map(self, pcd):
         
         points = np.asarray(pcd.points)
@@ -98,7 +104,7 @@ class Palletizing:
         # need to make min_idx to position (x, y) & return position
         #
     
-    def visualization_depth_map(self):
+    def visualization_depth_map(self, flag):
         
         # Set the size of the plotting window
         plt.figure(figsize=(10, 5))
@@ -107,7 +113,11 @@ class Palletizing:
         if hasattr(self, 'before_img') and self.before_img:  # Check if before_img exists
             self.before_img.remove()
         self.before_img = self.axes[0].imshow(self.before_depth_map, cmap='jet')
-        self.axes[0].set_title("Before Place Depth Map")
+        
+        if flag == 1:
+            self.axes[0].set_title("Before Place Depth Map")
+        elif flag == 2:
+            self.axes[0].set_title("Result Depth Map")
         
         # Adding the colorbar only once
         if not hasattr(self, 'color_bar'):  # Add colorbar only on the first run
@@ -121,3 +131,5 @@ class Palletizing:
 
         plt.draw()
         plt.pause(0.01)  # Gives a moment for the plots to update
+                
+        plt.show(block=False)
