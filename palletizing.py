@@ -13,11 +13,12 @@ class Palletizing:
         
         # Size of bucket
         self.h_max = 16/3
-        self.real_x, self.real_y, self.real_z = 41, 29, 16
+        self.real_x, self.real_y, self.real_z = 36, 25, 14
         
         # Initializing other values
         self.before_depth_map = None
         self.after_depth_map = None
+        self.weight_map = np.zeros((self.real_y, self.real_x), dtype=int)
         self.min_idx = (0, 0)
         self.place_h = 0
         self.x_min = 0.0
@@ -35,6 +36,8 @@ class Palletizing:
         plt.close(self.fig)
         self.before_img = None
         self.after_img = None
+
+        
         
     # Optimize function        
     def make_before_depth_map(self, pcd):
@@ -63,7 +66,9 @@ class Palletizing:
 
         # Assuming the depth map has already been initialized to the proper size and filled with z_min
         for i, j, z in zip(i_values, j_values, z_values):
-            self.before_depth_map[i, j] = max(self.before_depth_map[i, j], z)        
+            self.before_depth_map[i, j] = max(self.before_depth_map[i, j], z)
+
+        self.vis_depth_map = self.before_depth_map.copy()
         
     # def make_before_depth_map(self, pcd):
         
@@ -159,7 +164,6 @@ class Palletizing:
         z = self.z_max - z
         
         return x, y, z
-
     
     def visualization_depth_map(self, flag):
             
@@ -169,12 +173,12 @@ class Palletizing:
         # Visualizing Before Depth Map
         if hasattr(self, 'before_img') and self.before_img:  # Check if before_img exists
             self.before_img.remove()
-        self.before_img = self.axes[0].imshow(self.before_depth_map, cmap='jet')
+        self.before_img = self.axes[0].imshow(self.vis_depth_map, cmap='jet')
         
         if flag == 1:
             self.axes[0].set_title("Before Place Depth Map")
         elif flag == 2:
-            self.axes[0].set_title("Result Depth Map")
+            self.axes[0].set_title("Result Depth Map + Weight Masking")
         
         # Adding the colorbar for Before Depth Map
         if not hasattr(self, 'color_bar_before'):  # Add colorbar only on the first run
@@ -194,3 +198,46 @@ class Palletizing:
         plt.pause(0.01)  # Gives a moment for the plots to update
                 
         plt.show(block=False)
+
+
+    def make_weight_map(self, list_from_robot_cam, list_from_fixed_cam):
+
+        # list_from_robot_cam = [[x, y, width, height, detected obj weight], ...]
+        # list_from_fixed_cam = [grasped obj weight]
+        
+        # set zero point 
+        list_from_robot_cam[:, 0] -= -26
+        list_from_robot_cam[:, 1] -= -16
+
+        res_x, res_y = self.real_x / 52 / self.cell_size, self.real_y / 32 / self.cell_size
+        
+
+        for item in list_from_robot_cam:
+            x, y, w, h, weight = item
+            x_min, x_max = x, x + w
+            y_min, y_max = y, y + h
+
+            for y_coord in np.arrange(y_min, y_max + 1, 0.1):
+                for x_coord in np.arrange(x_min, x_max + 1, 0.1):
+                    i = int(y_coord * res_y - 1)
+                    j = int(x_coord * res_x - 1)
+                    i = min(int(y_coord * res_y), self.weight_map.shape[0] - 1)
+                    j = min(int(x_coord * res_x), self.weight_map.shape[1] - 1)
+                    self.weight_map[i, j] = weight
+        
+        self.weightmap2mask(list_from_fixed_cam)
+
+
+    def weightmap2mask(self, list_from_fixed_cam):
+
+        list_from_fixed_cam = np.array[list_from_fixed_cam].copy()
+        grasp_obj_weight = list_from_fixed_cam[0,0]
+
+        for i in self.real_y:
+            for j in self.real_x:
+                if self.weight_map[i][j] < grasp_obj_weight:
+                    self.before_depth_map[i][j] *= 100
+                else:
+                    self.before_depth_map[i][j] *= 1
+
+

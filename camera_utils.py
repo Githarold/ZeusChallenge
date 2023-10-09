@@ -51,6 +51,15 @@ class FrameCapture:
         align_to = rs.stream.color
         self.align = rs.align(align_to)
 
+        # Get intrinsics
+        depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+        self.intrinsics = depth_profile.get_intrinsics()
+
+        # Make depth_scale
+        depth_sensor = profile.get_device().first_depth_sensor()
+        self.depth_scale = depth_sensor.get_depth_scale()
+
+
     def get_frame(self):
         
         while True:
@@ -113,3 +122,8 @@ class FrameCapture:
     def free(self):
 
         self.pipeline.stop()
+
+
+    def get_scale_intrinsics(self):
+
+        return self.depth_scale, self.intrinsics

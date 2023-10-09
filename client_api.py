@@ -1,6 +1,7 @@
-from socket import *  # tcp socket
 import time
 
+from socket import *
+from scipy.spatial.transform import Rotation as Rot
 
 class JeusController():
 
@@ -10,6 +11,11 @@ class JeusController():
         self.client.connect(('192.168.0.23', 9000))
         self.client.setblocking(False)
         print('connected!')
+
+        self.T_cal = [ 1.  , 0.  , 0. ,  0.,
+                 0. ,  1.  , 0. , 90.,
+                 0. ,  0.  , 1., 345.,
+                 0.  , 0.  , 0.  , 1.]
 
     def get_current_pos(self):
         '''
@@ -81,19 +87,14 @@ class JeusController():
             if close_flag == 1:
                 break
 
-    def move(self, pose_list):
+    def move(self, T):
         '''
         Custom move command.
-        pose_list = [x,y,z,rx,ry,rz]
+        pose_list = [x,y,z,rz,ry,rx]
         '''
-        x = pose_list[0]
-        y = pose_list[1]
-        self.z_pick = pose_list[2]
-        rz = pose_list[3]
-        ry = pose_list[4]
-        rx = pose_list[5]
+        pose_list = self.HTM2PL(T)
 
-        list_data = [[0], [x, y, self.z_pick, rz, ry, rx]]
+        list_data = [[0], pose_list]
 
         self.send_data(list_data, "custom move")
 
@@ -129,18 +130,14 @@ class JeusController():
 
         self.send_data(list_data, "moving to depth position")
 
-    def move_object(self, pose_list):
+    def move_object(self, T):
         '''
         Move robot to XY axis position of the object.
-        pose = [x, y, z, rz, ry, rx]        
+        pose = [x, y, z, rz, ry, rx]
         '''
-        x = pose_list[0]
-        y = pose_list[1]
-        z = pose_list[2]
-        rz = pose_list[3]
-        ry = pose_list[4]
-        rx = pose_list[5]
-        list_data = [[6], [x, y, z, rz, ry, rx]]
+        pose_list = self.HTM2PL(T)
+        
+        list_data = [[6], pose_list]
 
         self.send_data(list_data, "moving object")
                 
@@ -156,8 +153,8 @@ class JeusController():
         '''
         Move robot in Z-axis direction to pick up the object.
         '''
-        offset = 50.0
-        list_data = [[7], [self.z_pick - offset, 0.0, 0.0, 0.0, 0.0, 0.0]]
+        offset = -50.0
+        list_data = [[7], [self.z_pick + offset, 0.0, 0.0, 0.0, 0.0, 0.0]]
 
         self.send_data(list_data, "pick")
 
@@ -174,3 +171,15 @@ class JeusController():
         
         print("close client")
         self.client.close()
+
+    def HTM2PL(self, T):
+        '''
+        Generate the homogeneous transformation matrix.
+        '''
+        HTM = self.T_cal @ T
+
+        P = HTM[:3, 3].tolist()
+        R = HTM[:3, :3]
+        euler_angles = Rot.from_matrix(R).as_euler('zyx', degrees=True).tolist()
+        
+        return P + euler_angles

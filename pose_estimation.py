@@ -100,7 +100,7 @@ class PoseDetector:
         )
         self.z_line_set.colors = o3d.utility.Vector3dVector([[0, 0, 1]])  # 파란색으로 표시
 
-        #### 로테이션 매트릭스 계산 ####
+        #### ROT_M 계산 ####
         z_0, z_1 = self.normal_vector, [0, 0, 1]
         y_0, y_1 = np.cross(z_0, z_1), np.cross(z_0, z_1) 
         x_0, x_1 = np.cross(z_0, y_0), np.cross(z_1, y_1)
