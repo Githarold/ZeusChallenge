@@ -71,11 +71,11 @@ class PoseDetector:
         
         # 법선벡터와 [0 0 1] 사이의 각도 계산 
 
-        dot_product = np.dot(self.normal_vector, [0, 0, 1])
-        norm_normal_vector = np.linalg.norm(self.normal_vector)
-        cosine = dot_product / norm_normal_vector * 1
-        angle_rad = np.arccos(np.clip(cosine, -1.0, 1.0))
-        self.angle_deg = np.degrees(angle_rad)
+        # dot_product = np.dot(self.normal_vector, [0, 0, 1])
+        # norm_normal_vector = np.linalg.norm(self.normal_vector)
+        # cosine = dot_product / norm_normal_vector * 1
+        # angle_rad = np.arccos(np.clip(cosine, -1.0, 1.0))
+        # self.angle_deg = np.degrees(angle_rad)
 
         # 법선 벡터의 크기와 방향 조절
         arrow_length = 0.05
@@ -124,16 +124,32 @@ class PoseDetector:
 
     def estimate_length(self):
 
-        if self.angle_deg < 10:
-            length_1 = np.max(self.plane_points[:, 0]) - np.min(self.plane_points[:, 0])
-            length_2 = np.max(self.plane_points[:, 1]) - np.min(self.plane_points[:, 1])
-            length_1, length_2 = np.ceil(length_1*102), np.ceil(length_2*102)
-            print(length_1, length_2)
+        # if self.angle_deg < 10:
+        #     length_1 = np.max(self.plane_points[:, 0]) - np.min(self.plane_points[:, 0])
+        #     length_2 = np.max(self.plane_points[:, 1]) - np.min(self.plane_points[:, 1])
+        #     length_1, length_2 = np.ceil(length_1*102), np.ceil(length_2*102)
+        #     print(length_1, length_2)
+        #     return length_1, length_2
 
-            return length_1, length_2
-                
+        length_1 = np.max(self.plane_points[:, 0]) - np.min(self.plane_points[:, 0])
+        length_2 = np.max(self.plane_points[:, 1]) - np.min(self.plane_points[:, 1])
+        length_1, length_2 = np.ceil(length_1*102), np.ceil(length_2*102)
+        print(length_1, length_2)
 
+        return length_1, length_2
+
+
+    def check_theta(self):
+
+        dot_product = np.dot(self.normal_vector, [0, 0, 1])
+        norm_normal_vector = np.linalg.norm(self.normal_vector)
+        cosine = dot_product / norm_normal_vector * 1
+        angle_rad = np.arccos(np.clip(cosine, -1.0, 1.0))
+        angle_deg = np.degrees(angle_rad)
+
+        return angle_deg
     
+
     def visualization(self):
 
         print("z cut")

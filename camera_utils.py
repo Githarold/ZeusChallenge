@@ -5,67 +5,75 @@ import pyrealsense2 as rs
 class FrameCapture:
 
     def __init__(self, serial):
+
+        self.serial = serial
         
         ctx = rs.context()
         devices = ctx.query_devices()
 
-        if len(devices) < 2:
-            print("Two cameras are required")
-            exit()
+        # if len(devices) < 2:
+        #     print("Two cameras are required")
+        #     exit()
         
-        # Configure depth and color streams
-        self.pipeline = rs.pipeline()
-        self.config = rs.config()
-        self.config.enable_device(serial)
+        while True:
 
-        self.pc = rs.pointcloud()
-    
-        # Get device product line for setting a supporting resolution
-        pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
-        pipeline_profile = self.config.resolve(pipeline_wrapper)
+            try:  # Start of try-except block
 
-        # device = pipeline_profile.get_device()
+                # Configure depth and color streams
+                self.pipeline = rs.pipeline()
+                self.config = rs.config()
+                self.config.enable_device(serial)
 
-        # found_rgb = False
-        # for s in device.sensors:
-        #     if s.get_info(rs.camera_info.name) == 'RGB Camera':
-        #         found_rgb = True
-        #         break
+                self.pc = rs.pointcloud()
+
+                # Get device product line for setting a supporting resolution
+                pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+                pipeline_profile = self.config.resolve(pipeline_wrapper)
+
+                self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+                self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+                profile = self.pipeline.start(self.config)
+                
+                # Post processing with realsense-viewer default setting
+                with open("D435i.json", 'r') as file:
+                    json_str = file.read().strip()
+                device = profile.get_device()
+                advanced_mode = rs.rs400_advanced_mode(device)
+                advanced_mode.load_json(json_str)        
+                
+                # Make align
+                align_to = rs.stream.color
+                self.align = rs.align(align_to)
+
+                # Get intrinsics
+                depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+                self.intrinsics = depth_profile.get_intrinsics()
+
+                # Make depth_scale
+                depth_sensor = profile.get_device().first_depth_sensor()
+                self.depth_scale = depth_sensor.get_depth_scale()
+
+                break
             
-        # if not found_rgb:
-        #     print("The project requires Depth camera with Color sensor")
-        #     exit(0)
 
-        self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        profile = self.pipeline.start(self.config)
-        
-        # Post processing with realsense-viewer default setting
-        with open("D435i.json", 'r') as file:
-            json_str = file.read().strip()
-        device = profile.get_device()
-        advanced_mode = rs.rs400_advanced_mode(device)
-        advanced_mode.load_json(json_str)        
-        
-        # Make align
-        align_to = rs.stream.color
-        self.align = rs.align(align_to)
+            except RuntimeError as e2:  # Handling exceptions
+                print(f"RuntimeError !!! : {e2}")
+                self.pipeline.stop()  # Stop the pipeline
+                # raise  # Re-raise the exception for further handling or to inform the caller
 
-        # Get intrinsics
-        depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
-        self.intrinsics = depth_profile.get_intrinsics()
+            except Exception as e:  # Handling exceptions
+                print(f"Error during initialization: {e}")
+                self.pipeline.stop()  # Stop the pipeline
+                # raise  # Re-raise the exception for further handling or to inform the caller
 
-        # Make depth_scale
-        depth_sensor = profile.get_device().first_depth_sensor()
-        self.depth_scale = depth_sensor.get_depth_scale()
+        print("Camera allocate done")
 
-
-    def get_frame(self):
+    def get_frame(self, timeout_ms=6000):  # Default timeout set to 6000ms (6 seconds)
         
         while True:
             try:
-                # Get camera frame
-                frames = self.pipeline.wait_for_frames()
+                # Get camera frame with a timeout
+                frames = self.pipeline.wait_for_frames(timeout_ms)
                 aligned_frames = self.align.process(frames)
 
                 # Align depth frame to color frame        
@@ -80,6 +88,8 @@ class FrameCapture:
 
             except Exception as e:
                 print(f"Error getting frames: {e}. Retrying...")
+                self.pipeline.stop()
+                self.__init__(self.serial)
                 continue
     
     def get_pcd(self, depth_frame, color_frame, flag):
@@ -98,9 +108,9 @@ class FrameCapture:
         points_z = depths / 1000.0
         
         if (flag == 'object'):
-            zmin, zmax = 0.36, 0.56
+            zmin, zmax = 0.20, 0.45
         elif (flag == 'depth'):
-            zmin, zmax = 0.32, 0.54
+            zmin, zmax = 0.25, 0.50
         
         # remove outlier
         mask = (points_z > zmin) & (points_z < zmax)

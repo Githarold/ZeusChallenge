@@ -24,7 +24,7 @@ class YoloDetector:
         self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names
 
     # to make weight map
-    def detect_obj_property(self, color_frame, depth_frame, depth_scale, intrinsics, save_img=False):
+    def detect_obj_property(self, color_frame, depth_frame, depth_scale, intrinsics):
 
         detected_objects = []
         # Check if the frame is a NumPy array, if not, convert it
@@ -58,8 +58,8 @@ class YoloDetector:
                 y2 = min(int(y2), depth_image.shape[0] - 1)
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
-                center_x = center_x.cpu().numpy()
-                center_y = center_y.cpu().numpy()
+                center_x = center_x.cpu().detach().numpy()
+                center_y = center_y.cpu().detach().numpy()
                 depth_value = depth_image[int(center_y)][int(center_x)] * depth_scale
 
                 x3D_1, y3D_1, z3D_1 = rs.rs2_deproject_pixel_to_point(intrinsics, [x1, y1], depth_value)
@@ -82,8 +82,9 @@ class YoloDetector:
         return detected_objects
     
     # anygrasp obj detect or for fixed cam
-    def detect_obj_list(self, color_frame, save_img=False):
+    def detect_obj_list(self, color_frame):
 
+        flag = 0
         detected_classes = []
         # Check if the frame is a NumPy array, if not, convert it
         if not isinstance(color_frame, np.ndarray):
@@ -105,6 +106,7 @@ class YoloDetector:
 
         # Process detections
         if len(pred[0]):
+            flag = 1
             det = pred[0]
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
             for *xyxy, conf, cls in reversed(det):
@@ -117,7 +119,9 @@ class YoloDetector:
         # Display the image with detections in a separate thread
         threading.Thread(target=self.display_image, args=(im0,)).start()
 
-        return detected_classes
+        detected_classes = np.array(detected_classes)
+
+        return detected_classes, flag
     
     def display_image(self, img):
         

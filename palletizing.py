@@ -16,8 +16,8 @@ class Palletizing:
         self.real_x, self.real_y, self.real_z = 36, 25, 14
         
         # Initializing other values
-        self.before_depth_map = None
-        self.after_depth_map = None
+        self.before_depth_map = np.zeros((self.real_y, self.real_x), dtype=int)
+        self.after_depth_map = np.zeros((self.real_y, self.real_x), dtype=int)
         self.weight_map = np.zeros((self.real_y, self.real_x), dtype=int)
         self.min_idx = (0, 0)
         self.place_h = 0
@@ -35,9 +35,7 @@ class Palletizing:
         self.fig, self.axes = plt.subplots(2, 1, figsize=(10, 5))
         plt.close(self.fig)
         self.before_img = None
-        self.after_img = None
-
-        
+        self.after_img = None        
         
     # Optimize function        
     def make_before_depth_map(self, pcd):

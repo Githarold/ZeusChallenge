@@ -1,4 +1,5 @@
-# !/usr/bin/python
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 from i611_MCS import *
 from teachdata import *
@@ -6,7 +7,8 @@ from i611_extend import *
 from rbsys import *
 from i611_common import *
 from i611_io import *
-from i611shm import *
+from i611shm import * 
+
 
 from socket import *
 import _socket
@@ -18,7 +20,7 @@ class tcp_server():
         # you must set port number larger than 1024
         self.listen_socket = socket(AF_INET, SOCK_STREAM)
         
-        # If an exception occurs, wait for 1 second and immediately allocate the port
+        # exception이 나면 1초 기다리고 바로 포트를 할당할 수 있게 함
         self.listen_socket.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
         self.listen_socket.bind((host, port))
         self.listen_socket.listen(1)
@@ -56,24 +58,27 @@ class tcp_server():
 class move_zeus():
     
     def __init__(self):
-        # Initialize
-        # ZERO robot constructor
-        offset_4 = 272.0
+        ## 2. 초기 설정② ####################################
+        # ZERO 로봇 생성자
+        # offset_4 = 272.0
+        offset_4 = 270.0
         offset_5 = 385.0
         self.rb = i611Robot()
         
-        # Definition of coordinate system
+        # 좌표계의 정의
         _BASE = Base()
-        # Initialize connection start with robot
+        # 로봇과 연결 시작 초기화
         self.rb.open()
-        # Initialization of I/O input/output function
+        # I/O 입출력 기능의 초기화 
         IOinit( self.rb )
         self.rb.settool(id = 4, offz=offset_4)
         self.rb.settool(id = 5, offz=offset_5)
         self.rb.changetool(4)  
         # self.robot_pose = [0,0,0,0,0,0]
-        self.m = MotionParam(jnt_speed=50, lin_speed=300, overlap=30, acctime=1, dacctime=1)
-        self.rb.motionparam( self.m )        
+        # self.m = MotionParam(jnt_speed=50, lin_speed=300, overlap=30, acctime=1, dacctime=1)
+        self.m = MotionParam(jnt_speed=20, lin_speed=30, overlap=30, acctime=1, dacctime=1)
+        self.rb.motionparam( self.m )
+        
         
     def get_curr_pose(self):
         self.rb.changetool(5) 
@@ -117,6 +122,9 @@ class move_zeus():
         x = pose_array[0]
         y = pose_array[1]
         z = curr_pos_list[2]
+        
+        
+        
         rz = curr_pos_list[3]
         ry = curr_pos_list[4]
         rx = curr_pos_list[5]
@@ -131,18 +139,23 @@ class move_zeus():
         self.rb.sleep(0.1)
         curr_pos = self.rb.getpos()
         curr_pos_list = curr_pos.pos2list()
-                    
+        
+            
         print "move_by_position"
         x = pose_array[0]
         y = pose_array[1]
-        z = curr_pos_list[2]
+        # z = curr_pos_list[2]
+        z = pose_array[2]
+        
+        
         rz = pose_array[3]
-        ry = pose_array[4]
-        rx = pose_array[5]
+        ry = curr_pos_list[4]
+        rx = curr_pos_list[5]
         pose = curr_pos_list[7]
         position = Position( x, y, z, rz, ry, rx, posture = pose )
 
-        self.rb.move(position)       
+        self.rb.move(position)
+       
     
     def move_place_pos(self):
         # self.rb.settool(id = 4, offz=offset)
@@ -183,7 +196,8 @@ class move_zeus():
         # pick_position = Position( x = 446.80,y = 269.60,z = 371.60,rz = -90.0, ry = -0.00,rx = -180.0, posture = curr_pos_list[7])
         pick_position = Position( x = 446.80,y = 269.60,z = 371.60,rz = -90.0, ry = -0.00,rx = -180.0, posture = 6)
         self.rb.move(pick_position)
-        self.rb.sleep(0.5)        
+        self.rb.sleep(0.5)
+        
     
     def pick(self, z_pos):
         self.rb.changetool(4) 
@@ -192,7 +206,11 @@ class move_zeus():
         curr_pos_list = curr_pos.pos2list()
         dout(48, '000')
         print "pick"
-        pick_position = Position( curr_pos_list[0], curr_pos_list[1], z_pos, curr_pos_list[3], curr_pos_list[4], curr_pos_list[5], posture = curr_pos_list[7])
+        # pick_position = Position( curr_pos_list[0], curr_pos_list[1], z_pos -50, curr_pos_list[3], curr_pos_list[4], curr_pos_list[5], posture = curr_pos_list[7])
+        pick_position = Position( curr_pos_list[0], curr_pos_list[1], curr_pos_list[2] + z_pos, curr_pos_list[3], curr_pos_list[4], curr_pos_list[5], posture = curr_pos_list[7])
+        
+        print "pick pos"
+        print curr_pos_list[2] + z_pos
         
         self.rb.move(pick_position)
         self.rb.sleep(0.1)
@@ -223,7 +241,19 @@ class move_zeus():
         pick_position2 = Position( curr_pos_list[0], curr_pos_list[1], 371.60, curr_pos_list[3], curr_pos_list[4], curr_pos_list[5], posture = curr_pos_list[7])
         self.rb.move(pick_position2)
         
-        self.rb.sleep(0.5)        
+        self.rb.sleep(0.5)
+
+    def gripper_open(self):
+        dout(48, '000')
+        self.rb.sleep(0.1)
+        dout(48, '100')
+        self.rb.sleep(0.1)
+
+    def gripper_close(self):
+        dout(48, '000')
+        self.rb.sleep(0.1)
+        dout(48, '001')
+        self.rb.sleep(0.1)
     
     def close_zeus(self):
         self.rb.close()
@@ -240,7 +270,7 @@ if __name__ == "__main__":
             # robot.move_pick_pos()
             # curr_pos = robot.get_curr_pose()
                 
-            # print curr_pos
+            # print curr_pos 
             client_socket = server.connect_client()
             
             if client_socket:
@@ -256,6 +286,9 @@ if __name__ == "__main__":
                         server.close_client_connection()
                         break
                     
+                    print "data 00"
+                    print data[0][0]
+
                     if get_flag:
                         if data[0][0] == 0:
                             pose = data[1]
@@ -309,7 +342,18 @@ if __name__ == "__main__":
                             pose = data[1]
                             robot.move_only_translations(pose)
                             server.send_data(1)
+                        
+                        elif data[0][0] == 10:
+                            print "gripper open"
                             
+                            robot.gripper_open()
+                            server.send_data(1)
+                        
+                        elif data[0][0] == 11:
+                            print "gripper close"
+                            
+                            robot.gripper_close()
+                            server.send_data(1)
                         else :
                             print 'error no detect index'
                             server.send_data(-1)
@@ -325,14 +369,14 @@ if __name__ == "__main__":
         robot.close_zeus()
     
     # except Exception:
-    # print "exception"
+    #     print "exception"
         
         
-    # server.close_client_connection()
+    #     server.close_client_connection()
         
-    # # close server
-    # server.close_server()
+    #     # close server
+    #     server.close_server()
         
-    # # close zeus robot
-    # robot.close_zeus()
+    #     # close zeus robot
+    #     robot.close_zeus()
         

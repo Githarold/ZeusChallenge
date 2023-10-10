@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import open3d as o3d
 from gsnet import AnyGrasp
+from multiprocessing import Process
 
 class GraspDetector:
     
@@ -20,13 +21,14 @@ class GraspDetector:
         self.anygrasp = AnyGrasp(cfgs)
         self.anygrasp.load_net()
 
-        xmin, xmax = -0.1, 0.1
-        ymin, ymax = -0.1, 0.1
+        xmin, xmax = -0.2, 0.2
+        ymin, ymax = -0.2, 0.2
         zmin, zmax = 0.0, 1.0
         self.lims = [xmin, xmax, ymin, ymax, zmin, zmax]
 
     def predict_grasp(self, depth_frame, color_frame, pc):
 
+        flag = 1
         depths = np.asanyarray(depth_frame.get_data())
         colors = np.asanyarray(color_frame.get_data())
 
@@ -41,7 +43,7 @@ class GraspDetector:
         points_z = depths / 1000.0
 
         # remove outlier
-        mask = (points_z > 0.15) & (points_z < 0.4)
+        mask = (points_z > 0.30) & (points_z < 0.60)
         points = verts.reshape(480, 640, 3)
         points = points[mask].astype(np.float32)
         colors = colors[mask].astype(np.float32)
@@ -51,8 +53,8 @@ class GraspDetector:
 
         if len(gg) == 0:
             print('No grasp detect!')
-            return None
-        
+            flag = 0
+
         gg = gg.nms().sort_by_score()
         gg_pick = gg[0:20]
         print('grasp score:', gg_pick[0].score)
@@ -70,7 +72,34 @@ class GraspDetector:
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(pointss)
         pcd.colors = o3d.utility.Vector3dVector(colors)
-        o3d.visualization.draw_geometries([pcd])
-        print("get pcd complete")
+
+        # threading.Thread(target=self.display_anygrasp, args=(grippers[0], pcd,)).start()
+        Process(target=self.display_anygrasp, args=(grippers[0], pcd)).start()
+
+        translation = gg_pick[0].translation
+        translation[0] *= 1000
+        translation[1] *= 1000
+        translation[2] *= 1000 
+
+        rotation = gg_pick[0].rotation_matrix
+        print(rotation)
+        x = rotation[:, 0].copy()
+        y = rotation[:, 1].copy()
+        z = rotation[:, 2].copy()
+
+        rotation[:, 0] = -y
+        rotation[:, 1] = -z
+        rotation[:, 2] = x
+        print(rotation)
+
+        htm = np.eye(4)
+        htm[:3, 3] = translation
+        htm[:3, :3] = rotation
+        print(f"tran {translation}")
+        print(f"homo : {htm}")
+        return htm, gg_pick[0].score, flag
+    
+    def display_anygrasp(self, gripper, pcd):
+        o3d.visualization.draw_geometries([gripper, pcd])
+
         
-        return gg_pick[0]
