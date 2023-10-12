@@ -128,9 +128,11 @@ class YoloDetector:
         cv2.destroyAllWindows()
     
     def class2weight(self, cls):
-        # water = 0, jelly = 1, cho mil = 2, ramen = 3, tissue = 4, ace = 5, spam = 6, brush = 7, tape = 8
-        if cls in [0, 6, 7, 8]:
+        # water = 0, jelly = 1, cho mil = 2, ramen = 3, tissue = 4, ace = 5, spam = 6, milk_tea = 
+        # jelly = 0, milk_tea = 1, tissue = 2, cup_ramen = 3, spam = 4, choco_milk = 5, ace = 6
+        if cls in [1, 2, 3, 4]:
             weight = 2
         else:
             weight = 1
+            
         return weight
