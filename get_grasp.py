@@ -20,6 +20,7 @@ class GraspDetector:
 
         self.anygrasp = AnyGrasp(cfgs)
         self.anygrasp.load_net()
+        self.p = None
 
         xmin, xmax = -0.2, 0.2
         ymin, ymax = -0.2, 0.2
@@ -43,7 +44,7 @@ class GraspDetector:
         points_z = depths / 1000.0
 
         # remove outlier
-        mask = (points_z > 0.30) & (points_z < 0.60)
+        mask = (points_z > 0.25) & (points_z < 0.53)
         points = verts.reshape(480, 640, 3)
         points = points[mask].astype(np.float32)
         colors = colors[mask].astype(np.float32)
@@ -55,6 +56,10 @@ class GraspDetector:
             print('No grasp detect!')
             flag = 0
 
+            ##################################
+            htm = np.eye(4)
+            return htm, 101.0, flag   # kym
+            ##################################
         gg = gg.nms().sort_by_score()
         gg_pick = gg[0:20]
         print('grasp score:', gg_pick[0].score)
@@ -73,30 +78,28 @@ class GraspDetector:
         pcd.points = o3d.utility.Vector3dVector(pointss)
         pcd.colors = o3d.utility.Vector3dVector(colors)
 
-        # threading.Thread(target=self.display_anygrasp, args=(grippers[0], pcd,)).start()
-        Process(target=self.display_anygrasp, args=(grippers[0], pcd)).start()
+        if self.p is not None and self.p.is_alive():
+            self.p.terminate()
 
-        translation = gg_pick[0].translation
-        translation[0] *= 1000
-        translation[1] *= 1000
-        translation[2] *= 1000 
+        # New process start
+        self.p = Process(target=self.display_anygrasp, args=(grippers[0], pcd))
+        self.p.start()
+
+        translation = gg_pick[0].translation * 1000.0
 
         rotation = gg_pick[0].rotation_matrix
-        print(rotation)
         x = rotation[:, 0].copy()
         y = rotation[:, 1].copy()
         z = rotation[:, 2].copy()
 
-        rotation[:, 0] = -y
-        rotation[:, 1] = -z
+        rotation[:, 0] = -z
+        rotation[:, 1] = y
         rotation[:, 2] = x
-        print(rotation)
 
         htm = np.eye(4)
         htm[:3, 3] = translation
         htm[:3, :3] = rotation
-        print(f"tran {translation}")
-        print(f"homo : {htm}")
+        
         return htm, gg_pick[0].score, flag
     
     def display_anygrasp(self, gripper, pcd):

@@ -1,6 +1,8 @@
 import open3d as o3d
 import numpy as np
 
+from scipy.spatial.transform import Rotation as Rot
+
 class PoseDetector:
     def __init__(self):
 
@@ -8,7 +10,7 @@ class PoseDetector:
 
 
     def estimate_plane(self, pcd):
-
+        # o3d.visualization.draw_geometries([pcd])
         points = np.asarray(pcd.points)
         colors = np.asarray(pcd.colors)
         z_min, z_max = np.min(points[:, 2]), np.max(points[:, 2])
@@ -22,7 +24,6 @@ class PoseDetector:
         self.filtered_pcd = self.filtered_pcd.voxel_down_sample(voxel_size=0.005)
 
         labels = np.array(self.filtered_pcd.cluster_dbscan(eps=0.01, min_points=10, print_progress=True))
-
         # 각 클러스터의 최소 z 값 계산
         unique_labels = np.unique(labels)
         min_z_per_cluster = {}
@@ -50,7 +51,6 @@ class PoseDetector:
 
         # 평면의 법선 벡터
         self.normal_vector = np.array([a, b, c])
-        # print("Normal vector of the plane:", normal_vector)
 
         # 평면 위의 포인트들 추출
         self.plane_points = np.asarray(self.cluster_pcd.points)[inliers]
@@ -69,14 +69,6 @@ class PoseDetector:
 
     def estimate_pose(self):
         
-        # 법선벡터와 [0 0 1] 사이의 각도 계산 
-
-        # dot_product = np.dot(self.normal_vector, [0, 0, 1])
-        # norm_normal_vector = np.linalg.norm(self.normal_vector)
-        # cosine = dot_product / norm_normal_vector * 1
-        # angle_rad = np.arccos(np.clip(cosine, -1.0, 1.0))
-        # self.angle_deg = np.degrees(angle_rad)
-
         # 법선 벡터의 크기와 방향 조절
         arrow_length = 0.05
         arrow_origin = self.plane_center
@@ -115,28 +107,35 @@ class PoseDetector:
 
         # 두 좌표계 사이의 회전행렬 계산
         self.R = np.linalg.inv(self.R_0) @ R_1
+        self.R[:, 0:2] = -self.R[:, 0:2].copy()
 
-        T = np.eye(4)
-        T[:3, :3] = self.R
-
-        return T
+        sy = np.sqrt(self.R[0,0] * self.R[0,0] +  self.R[1,0] * self.R[1,0])
     
+        singular = sy < 1e-6
+
+        if not singular:
+            rz = np.arctan2(self.R[1,0], self.R[0,0])
+            ry = np.arctan2(-self.R[2,0], sy)
+            rx = np.arctan2(self.R[2,1], self.R[2,2])
+        else:
+            print("Singular orientation occur")
+            rz = np.arctan2(-self.R[1,2], self.R[1,1])
+            ry = np.arctan2(-self.R[2,0], sy)
+            rx = 0
+
+        return np.degrees(rz), np.degrees(ry), np.degrees(rx)    
 
     def estimate_length(self):
 
-        # if self.angle_deg < 10:
-        #     length_1 = np.max(self.plane_points[:, 0]) - np.min(self.plane_points[:, 0])
-        #     length_2 = np.max(self.plane_points[:, 1]) - np.min(self.plane_points[:, 1])
-        #     length_1, length_2 = np.ceil(length_1*102), np.ceil(length_2*102)
-        #     print(length_1, length_2)
-        #     return length_1, length_2
-
         length_1 = np.max(self.plane_points[:, 0]) - np.min(self.plane_points[:, 0])
         length_2 = np.max(self.plane_points[:, 1]) - np.min(self.plane_points[:, 1])
-        length_1, length_2 = np.ceil(length_1*102), np.ceil(length_2*102)
-        print(length_1, length_2)
+        length_1, length_2 = int(np.ceil(length_1*102)), int(np.ceil(length_2*102))
 
-        return length_1, length_2
+        offset_y = (np.max(self.plane_points[:, 1]) + np.min(self.plane_points[:, 1])) / 2
+
+        print(f"Length 1 is : {length_1}, Length 2 is : {length_2}, Y offest is : {offset_y}")
+
+        return length_1, length_2, offset_y
 
 
     def check_theta(self):
@@ -152,17 +151,17 @@ class PoseDetector:
 
     def visualization(self):
 
-        print("z cut")
-        o3d.visualization.draw_geometries([self.filtered_pcd, self.coordinate_frame])
+        # print("z cut")
+        # o3d.visualization.draw_geometries([self.filtered_pcd, self.coordinate_frame])
         
-        print("downsampling")
-        o3d.visualization.draw_geometries([self.filtered_pcd, self.coordinate_frame])
+        # print("downsampling")
+        # o3d.visualization.draw_geometries([self.filtered_pcd, self.coordinate_frame])
 
-        print("clustering")
-        o3d.visualization.draw_geometries([self.cluster_pcd, self.coordinate_frame])
+        # print("clustering")
+        # o3d.visualization.draw_geometries([self.cluster_pcd, self.coordinate_frame])
 
-        print("plane with vector")
-        o3d.visualization.draw_geometries([self.plane_pcd, self.coordinate_frame, self.line_set, self.z_line_set])
+        # print("plane with vector")
+        # o3d.visualization.draw_geometries([self.plane_pcd, self.coordinate_frame, self.line_set, self.z_line_set])
 
         base_axis = self.R_0.T
 
@@ -187,3 +186,14 @@ class PoseDetector:
         after_lineset = create_lineset(after_axis*0.1, origin, after_colors)
 
         o3d.visualization.draw_geometries([self.plane_pcd, base_lineset, after_lineset, self.coordinate_frame])
+
+    def compute_euler_difference(self):
+        # 상대 회전 행렬 계산
+        R1 = np.array([[-1, 0, 0],
+                [0, -1, 0],
+                [0, 0, 1]])
+        R = np.dot(R1, self.R_0)
+
+        euler_angles = Rot.from_matrix(R).as_euler('ZYX', degrees=True).tolist()
+
+        return euler_angles

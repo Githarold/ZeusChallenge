@@ -27,6 +27,7 @@ class YoloDetector:
     def detect_obj_property(self, color_frame, depth_frame, depth_scale, intrinsics):
 
         detected_objects = []
+
         # Check if the frame is a NumPy array, if not, convert it
         if not isinstance(color_frame, np.ndarray):
             color_frame = np.asanyarray(color_frame.get_data())
@@ -36,7 +37,6 @@ class YoloDetector:
         img = torch.from_numpy(color_frame).permute(2, 0, 1).to(self.device).float() / 255.0
 
         depth_image = np.asanyarray(depth_frame.get_data())
-
 
         if self.half:
             img = img.half()
@@ -69,7 +69,7 @@ class YoloDetector:
 
                 weight = self.class2weight(int(cls))
 
-                print(f"Object {weight}: Real Width: {int(real_width*100)}, Real Height: {int(real_height*100)}, Top-left corner: ({int(x3D_1*100)}, {int(y3D_1*100)})")
+                # print(f"Object {weight}: Real Width: {int(real_width*100)}, Real Height: {int(real_height*100)}, Top-left corner: ({int(x3D_1*100)}, {int(y3D_1*100)})")
                 detected_objects.append([(int(x3D_1*100)), (int(y3D_1*100)), int(real_width*100), int(real_height*100), weight])
 
 
@@ -79,7 +79,7 @@ class YoloDetector:
         # Display the image with detections in a separate thread
         threading.Thread(target=self.display_image, args=(im0,)).start()
 
-        return detected_objects
+        return np.array(detected_objects)
     
     # anygrasp obj detect or for fixed cam
     def detect_obj_list(self, color_frame):
@@ -119,9 +119,7 @@ class YoloDetector:
         # Display the image with detections in a separate thread
         threading.Thread(target=self.display_image, args=(im0,)).start()
 
-        detected_classes = np.array(detected_classes)
-
-        return detected_classes, flag
+        return np.array(detected_classes), flag
     
     def display_image(self, img):
         

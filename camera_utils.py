@@ -6,14 +6,16 @@ class FrameCapture:
 
     def __init__(self, serial):
 
+        self.coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05, origin=[0, 0, 0])
+
         self.serial = serial
         
         ctx = rs.context()
         devices = ctx.query_devices()
 
-        # if len(devices) < 2:
-        #     print("Two cameras are required")
-        #     exit()
+        if len(devices) < 2:
+            print("Two cameras are required")
+            exit()
         
         while True:
 
@@ -53,8 +55,7 @@ class FrameCapture:
                 depth_sensor = profile.get_device().first_depth_sensor()
                 self.depth_scale = depth_sensor.get_depth_scale()
 
-                break
-            
+                break            
 
             except RuntimeError as e2:  # Handling exceptions
                 print(f"RuntimeError !!! : {e2}")
@@ -93,7 +94,8 @@ class FrameCapture:
                 continue
     
     def get_pcd(self, depth_frame, color_frame, flag):
-        
+        self.clear_buffer()
+
         depths = np.asanyarray(depth_frame.get_data())
         colors = np.asanyarray(color_frame.get_data())
 
@@ -108,9 +110,9 @@ class FrameCapture:
         points_z = depths / 1000.0
         
         if (flag == 'object'):
-            zmin, zmax = 0.20, 0.45
+            zmin, zmax = -100.0, 100.0
         elif (flag == 'depth'):
-            zmin, zmax = 0.25, 0.50
+            zmin, zmax = 0.36, 0.58
         
         # remove outlier
         mask = (points_z > zmin) & (points_z < zmax)
@@ -118,13 +120,13 @@ class FrameCapture:
         points = points[mask].astype(np.float32)
         colors = colors[mask].astype(np.float32)
         
-        rot_mat = np.array([[1,0,0],[0,1,0],[0,0,-1]])
-        pointss = points@rot_mat        
-        colors = colors / 255        
+        colors = colors / 255
         
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pointss)
-        pcd.colors = o3d.utility.Vector3dVector(colors)        
+        pcd.points = o3d.utility.Vector3dVector(points)
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+
+        o3d.visualization.draw_geometries([pcd, self.coordinate_frame])
         
         return pcd
     
@@ -137,3 +139,12 @@ class FrameCapture:
     def get_scale_intrinsics(self):
 
         return self.depth_scale, self.intrinsics
+
+    def clear_buffer(self, num_frames=10):
+        """
+        clear realSense buffer
+        """
+        last_frame = None
+        for _ in range(num_frames):
+            last_frame = self.pipeline.wait_for_frames()
+        return last_frame
