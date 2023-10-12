@@ -12,29 +12,17 @@ class JeusController():
         self.client.setblocking(False)
         print('connected!')
         
-
-        # 1
-        # T_cal = [-0.00314022,  0.99994476 , 0.01003077 ,-0.11278258*1000.0,
-        #         -0.99999424, -0.00312717 ,-0.00131649,  0.04079831*1000.0,
-        #         -0.00128504 ,-0.01003485 , 0.99994882, -0.18338595*1000.0,
-        #         0.        ,  0.    ,      0.       , 1.        ]
+        T_cal = [-0.00314022,  0.99994476 , 0.01003077 ,-0.11278258*1000.0,
+                -0.99999424, -0.00312717 ,-0.00131649,  0.04079831*1000.0,
+                -0.00128504 ,-0.01003485 , 0.99994882, -0.18338595*1000.0,
+                0.        ,  0.    ,      0.       , 1.        ]
         
-
-        #2
-        T_cal = [-1.78418058e-03,  9.99903899e-01, -1.37480769e-02, -1.02841690e-01*1000,
- -9.99998347e-01 ,-1.77919711e-03 , 3.74706623e-04 , 3.79794325e-02*1000,
-  3.50210075e-04  ,1.37487227e-02  ,9.99905421e-01, -1.80563825e-01*1000,
- 0.00000000e+00 , 0.00000000e+00  ,0.00000000e+00,  1.00000000e+00]
-        
-        # T_cal = [0 ]
-
         self.rot = np.array([-1.  , 0.  , 0. ,  0.,
                  0. ,  -1.  , 0. , 0.,
                  0. ,  0.  , 1., 0.,
                  0.  , 0.  , 0.  , 1.]).reshape(-1,4)
                 
         self.T_cal = np.array(T_cal).reshape(4, 4)
-
 
     def get_current_pos(self):
         '''
@@ -153,45 +141,49 @@ class JeusController():
         pose = [x, y, z, rz, ry, rx]
         '''
         curr_pose = self.get_current_pos()
+        print(f"curr {curr_pose}")
         curr_T = self.transformation_matrix(curr_pose)
-        htm = curr_T @ self.T_cal
+
+        temp = curr_T @ self.rot
+
+        htm = temp @ self.T_cal
+
+        temp_mat = np.array([0.  , -1.  , 0. ,  0.,
+                 1. ,  0.  , 0. , 0.,
+                 0. ,  0.  , 1., 0.,
+                 0.  , 0.  , 0.  , 1.]).reshape(-1,4)
 
         T = htm @ T
 
         pose_list = self.HTM2PL(T)
-
-        if (pose_list[3] > 0):
-            pose_list[3] = -180 + pose_list[3]
-
+       
         print(f"go pose !!{pose_list}")
-
-        ########################################
-        # pose_list[2] += 100
-        ########################################
 
         list_data = [[6], pose_list]
 
-        self.pick_z = pose_list[2] 
+        self.pick_z = pose_list[2]
 
-        #####################################
 
-        if self.pick_z < -18.21:
-            print("detect plane!!")
-            return -1
-
-        #####################################
         self.send_data(list_data, "moving object")
-
-        return 1
                 
-    def move_only_position(self, x, y, z = 400):
+    def move_only_position(self, x, y, z):
         '''
         Move Zeus only position
         '''
+        curr_pose = self.get_current_pos()
+        curr_T = self.transformation_matrix(curr_pose)
+        htm = curr_T @ self.T_cal
+
+        relative_coords = np.array([x, y, z, 1])
+        absolute_coords =  htm @ relative_coords 
+        x_abs = absolute_coords[0]
+        y_abs = absolute_coords[1]
+        self.z_abs = absolute_coords[2]
         
-        list_data = [[9], [x, y, z]]
+        list_data = [[9], [x_abs, y_abs]]
         
         self.send_data(list_data, "moving only translations")
+
 
     def move_only_orientation(self, rz = 0.0, ry = 0.0, rx = 0.0):
         '''
@@ -209,17 +201,17 @@ class JeusController():
         Move robot in Z-axis direction to pick up the object.
         '''
         # offset = -60.0
-        # offset = -20.0
-        list_data = [[7], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+        offset = -20.0
+        list_data = [[7], [offset, 0.0, 0.0, 0.0, 0.0, 0.0]]
 
         self.send_data(list_data, "pick")
 
-    def place(self, z_abs = 0.0):
+    def place(self):
         '''
         Move robot in Z-axis direction to place the object.
         z_pos : position in Z-axis direction of the object
         '''
-        list_data = [[8], [z_abs, 0.0 , 0.0 , 0.0 , 0.0 , 0.0]]       
+        list_data = [[8], [self.z_abs, 0.0 , 0.0 , 0.0 , 0.0 , 0.0]]       
         
         self.send_data(list_data, "place")
 
@@ -254,7 +246,7 @@ class JeusController():
 
         P = HTM[:3, 3].tolist()
         R = HTM[:3, :3]
-        euler_angles = Rot.from_matrix(R).as_euler('ZYX', degrees=True).tolist()
+        euler_angles = Rot.from_matrix(R).as_euler('zyx', degrees=True).tolist()
   
         return P + euler_angles
     
@@ -268,7 +260,7 @@ class JeusController():
         ry = pose_list[4]
         rx = pose_list[5]
 
-        r = Rot.from_euler('ZYX', [rz,ry,rx], degrees=True)
+        r = Rot.from_euler('zyx', [rz,ry,rx], degrees=True)
 
         R = r.as_matrix()
         T = np.array([
@@ -280,22 +272,49 @@ class JeusController():
 
         return T
     
-    def depth_pos_to_abs(self, rel_x, rel_y):
-
-        depth_pose = [-70.87, 333.76, 354.93, -90.0 , -0.0, -180.0]
-        depth_T = self.transformation_matrix(depth_pose)
-
-        T_btoc = depth_T @ self.T_cal
-
-        print("depth_t :", T_btoc)
-
-        rel_V = np.array([rel_x, rel_y, 0.0, 0.0]).T
-
-        print(rel_V)
-
-        abs_T = T_btoc @ rel_V
-
-        print("abs_T :", abs_T)
+    
+    
+    def tran(self,rz):
+  
+        # 0 ~ 45
         
-        return abs_T[0], abs_T[1]
-        # return -abs_T[1], abs[0]
+        if rz > 0.0:
+        
+            if rz <= 45.0 and 0.0 < rz :
+            
+                return -45.0 - abs(abs(45) - abs(rz))
+                
+            # 45 ~ 90
+            elif rz <= 90.0 and 45.0 < rz :
+            
+                return -0.0 - abs(abs(90.0) - abs(rz))
+            
+            
+            elif rz <= 135.0 and 90.0 < rz:
+                return (-135  - abs(abs (135) - abs(rz)))
+            
+            elif rz <= 180.0 and 135.0 < rz:
+                return -90  - (abs(180) - abs(rz))
+            
+            elif rz == 180.0:
+                return -180.0
+            
+        else:
+            if rz > -45.0 and -0.0 >= rz :
+            
+                return -135 + (abs(-45) - abs(rz))
+                
+            # 45 ~ 90
+            elif rz > -90.0 and -45.0 >= rz :
+            
+                return -180 + (abs(-90) - abs(rz))
+            
+            
+            elif rz > -135.0 and -90.0 >= rz:
+                return (-45  + (abs(-135) - abs(rz)))
+            
+            elif rz > -180.0 and 135.0 >= rz:
+                return -90.0 + (abs(-180.0) - abs(rz))
+            
+            elif rz == -180.0:
+                return -180.0
