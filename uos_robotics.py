@@ -21,7 +21,6 @@ class UOSRobotics:
         self.camera1 = FrameCapture(serial='047322070277')   # mounted camera
         self.camera2 = FrameCapture(serial='139522076807')   # fixed camera
         self.depth_scale, self.intrinsics = self.camera1.get_scale_intrinsics()
-        self.object_pose_estimate_array = [0.0]
         atexit.register(self.camera1.free)
         atexit.register(self.camera2.free)        
         self.plane_stack = 0
@@ -48,8 +47,6 @@ class UOSRobotics:
         
         while True:
             print("Start")
-            self.object_pose_estimate_array = 0.0
-
             # Move to place to grasp object detect
             if self.miss_stack == 0:
                 self.zeus.move_pick()
@@ -147,7 +144,6 @@ class UOSRobotics:
                 rz, ry, rx = self.object.compute_euler_difference()
                 self.object.visualization()
                 self.zeus.move_only_orientation(0.0, 0.0, ry)
-                # self.object_pose_estimate_array.append(ry)          # kym
 
 
             object_pose = self.zeus.get_current_pos()

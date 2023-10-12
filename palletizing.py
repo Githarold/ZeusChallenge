@@ -47,13 +47,17 @@ class Palletizing:
         
         points = np.asarray(pcd.points)
 
-        z_max = 0.5
-        z_max = np.min(points[:, 2]), np.max(points[:, 2])
+        print(points)
+
+        # z_max = 0.5
+        # z_max = np.min(points[:, 2]), np.max(points[:, 2])
         
         # Set origin
         points[:, 0] -= self.x_min
         points[:, 1] -= self.y_min
-        points[:, 2] = z_max - points[:, 2]
+        points[:, 2] = 0.505 - points[:, 2]
+
+        print(points)
 
         # Update min, max
         self.x_min, self.x_max = np.min(points[:, 0]), np.max(points[:, 0])
@@ -127,8 +131,11 @@ class Palletizing:
         # rel_x = x_min * 1000.0 + (j + len2 / 2.0) * 10.0
         # rel_y = y_min * 1000.0 + (i + len1 / 2.0 - offset_y) * 10.0
 
-        rel_x = self.x_min * 1000.0 + (j + len2 / 2.0) * 10.0
-        rel_y = self.y_min * 1000.0 + (i + len1 / 2.0 - offset_y) * 10.0
+        x_min = -0.213
+        y_min = -0.148
+
+        rel_x = x_min * 1000.0 + (j + len2 / 2.0) * 10.0
+        rel_y = y_min * 1000.0 + (i + len1 / 2.0 - offset_y) * 10.0
 
         return rel_x, rel_y
 
