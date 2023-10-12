@@ -98,6 +98,7 @@ class Palletizing:
         depth_map = self.before_depth_map.copy()
 
         find_flag = False
+        find_rotate_flag = False
         h, w = depth_map.shape
         min_height = float('inf')
         std_map = np.ones((h-len1, w-len2))
@@ -117,15 +118,34 @@ class Palletizing:
                         min_height = depth_map[i, j]
                         self.min_idx = (i, j)
                         self.place_h = depth_map[i, j]
+                        
+        if not find_flag:            
+            for i in range (h - len2):
+                
+                for j in range (w - len1):
+                    tmp_map = depth_map[i:i+len2, j:j+len1]
+                    
+                    # Find plane
+                    if len(np.unique(tmp_map)) == 1:
+                        find_rotate_flag = True
+                        
+                        if depth_map[i, j] <= min_height:
+                            min_height = depth_map[i, j]
+                            self.min_idx = (i, j)
+                            self.place_h = depth_map[i, j]        
         
         # Not found
-        if not find_flag:
+        if not find_flag and not find_rotate_flag:
             min_std_idx = np.argmin(std_map)
             self.min_idx = np.unravel_index(min_std_idx, std_map.shape)          
             print('perfect plane is not found, alternative position find')        
 
-        depth_map[self.min_idx[0]:self.min_idx[0]+len1, self.min_idx[1]:self.min_idx[1]+len2] += self.h_max
-        self.after_depth_map = depth_map
+        if find_rotate_flag:
+            depth_map[self.min_idx[0]:self.min_idx[0]+len2, self.min_idx[1]:self.min_idx[1]+len1] += self.h_max
+            self.after_depth_map = depth_map
+        else:
+            depth_map[self.min_idx[0]:self.min_idx[0]+len1, self.min_idx[1]:self.min_idx[1]+len2] += self.h_max
+            self.after_depth_map = depth_map
 
         end_time = time.time()
         print(self.min_idx)
@@ -134,10 +154,14 @@ class Palletizing:
         x_min = -0.213
         y_min = -0.148
 
-        rel_x = x_min * 1000.0 + (i + len2 / 2.0) * 10.0
-        rel_y = y_min * 1000.0 + (j + len1 / 2.0) * 10.0 - offset_y * 1000.0        
+        if find_rotate_flag:
+            rel_x = x_min * 1000.0 + (i + len1 / 2.0) * 10.0 - offset_y * 1000.0
+            rel_y = y_min * 1000.0 + (j + len2 / 2.0) * 10.0
+        else:
+            rel_x = x_min * 1000.0 + (i + len2 / 2.0) * 10.0
+            rel_y = y_min * 1000.0 + (j + len1 / 2.0) * 10.0 - offset_y * 1000.0        
 
-        return rel_x, rel_y
+        return rel_x, rel_y, find_rotate_flag
 
     def visualization_depth_map(self, flag):
             

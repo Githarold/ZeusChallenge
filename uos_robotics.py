@@ -152,7 +152,7 @@ class UOSRobotics:
             len1, len2, offset_y = self.object.estimate_length()
             
             # Make depth map & visualization
-            rel_x, rel_y = self.pack.make_after_depth_map(len1, len2, offset_y)
+            rel_x, rel_y, rotate_flag = self.pack.make_after_depth_map(len1, len2, offset_y)
             abs_x, abs_y = self.zeus.depth_pos_to_abs(rel_x, rel_y)
 
             # self.pack.visualization_depth_map(flag = 1)
