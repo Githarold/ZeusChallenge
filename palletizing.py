@@ -25,10 +25,10 @@ class Palletizing:
         self.before_depth_map = np.zeros((self.real_y, self.real_x), dtype=int)
         self.min_idx = (0, 0)
         self.place_h = 0
-        self.x_min = -0.213
-        self.x_max = 0.184
-        self.y_min = -0.148
-        self.y_max = 0.145
+        self.x_min = 0.0
+        self.x_max = 0.0
+        self.y_min = 0.0
+        self.y_max = 0.0
         self.z_min = 0.0
         self.z_max = 0.0
         self.res_x = 0.0
@@ -46,24 +46,29 @@ class Palletizing:
     def make_before_depth_map(self, pcd):
         
         points = np.asarray(pcd.points)
-
-        print(points)
-
-        # z_max = 0.5
-        # z_max = np.min(points[:, 2]), np.max(points[:, 2])
+        colors = np.asarray(pcd.colors)
+        z_min_hc, z_max_hc = 0.374, 0.505
+        
+        # Masking
+        indices = np.where((points[:, 2] >= z_min_hc) & (points[:, 2] <= z_max_hc))[0]
+        points = points[indices]
+        colors = colors[indices]
+        
+        pcd.points, pcd.colors = o3d.utility.Vector3dVector(points), o3d.utility.Vector3dVector(colors)
+        o3d.visualization.draw_geometries([pcd])
+        
+        x_min = np.min(points[:, 0])
+        y_min = np.min(points[:, 1]) 
         
         # Set origin
-        points[:, 0] -= self.x_min
-        points[:, 1] -= self.y_min
-        points[:, 2] = 0.505 - points[:, 2]
-
-        print(points)
+        points[:, 0] -= x_min
+        points[:, 1] -= y_min
+        points[:, 2] = 0.505 - points[:, 2]        
 
         # Update min, max
         self.x_min, self.x_max = np.min(points[:, 0]), np.max(points[:, 0])
         self.y_min, self.y_max = np.min(points[:, 1]), np.max(points[:, 1])
-        # self.z_min, self.z_max = np.min(points[:, 2]), np.max(points[:, 2])
-        self.z_min, self.z_max = 0.0, 0.505 - 0.374
+        self.z_min, self.z_max = np.min(points[:, 2]), np.max(points[:, 2])
         
         self.res_x = self.real_x/(self.x_max - self.x_min)/self.cell_size
         self.res_y = self.real_y/(self.y_max - self.y_min)/self.cell_size
@@ -124,18 +129,13 @@ class Palletizing:
 
         end_time = time.time()
         print(self.min_idx)
-        print(f"Calculate time : {end_time - start_time} seconds")
-
-        # x_min, y_min = -0.220, -0.142   # (m)
-
-        # rel_x = x_min * 1000.0 + (j + len2 / 2.0) * 10.0
-        # rel_y = y_min * 1000.0 + (i + len1 / 2.0 - offset_y) * 10.0
-
+        print(f"Calculate time : {end_time - start_time} seconds")        
+        
         x_min = -0.213
         y_min = -0.148
 
-        rel_x = x_min * 1000.0 + (j + len2 / 2.0) * 10.0
-        rel_y = y_min * 1000.0 + (i + len1 / 2.0 - offset_y) * 10.0
+        rel_x = x_min * 1000.0 + (i + len2 / 2.0) * 10.0
+        rel_y = y_min * 1000.0 + (j + len1 / 2.0) * 10.0 - offset_y * 1000.0        
 
         return rel_x, rel_y
 
