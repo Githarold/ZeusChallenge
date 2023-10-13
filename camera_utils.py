@@ -112,7 +112,7 @@ class FrameCapture:
         if (flag == 'object'):
             zmin, zmax = -100.0, 100.0
         elif (flag == 'depth'):
-            zmin, zmax = 0.36, 0.58
+            zmin, zmax = -100.0, 100.0
         
         # remove outlier
         mask = (points_z > zmin) & (points_z < zmax)
@@ -125,8 +125,6 @@ class FrameCapture:
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
         pcd.colors = o3d.utility.Vector3dVector(colors)
-
-        o3d.visualization.draw_geometries([pcd, self.coordinate_frame])
         
         return pcd
     

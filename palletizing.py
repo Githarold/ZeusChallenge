@@ -12,7 +12,7 @@ class Palletizing:
         
         # Size of cell(grid)
         self.cell_size = 1
-        self.z_cell_size = 1
+        self.z_cell_size = 2
         
         # Size of bucket
         self.h_max = 4
@@ -34,19 +34,18 @@ class Palletizing:
         self.res_x = 0.0
         self.res_y = 0.0
         self.res_z = 0.0
+        self.init_flag = 0
         
         # Initializing figure
         self.fig, self.axes = plt.subplots(2, 1, figsize=(10, 5))
         # plt.close(self.fig)
         self.before_img = None
         self.after_img = None
-
-        cv2.namedWindow('Depth Maps', cv2.WINDOW_NORMAL)
                
     def make_before_depth_map(self, pcd):
         
-        points = np.asarray(pcd.points)
-        colors = np.asarray(pcd.colors)
+        points = np.asarray(pcd.points).copy()
+        colors = np.asarray(pcd.colors).copy()
         z_min_hc, z_max_hc = 0.374, 0.505
         
         # Masking
@@ -63,7 +62,17 @@ class Palletizing:
         # Set origin
         points[:, 0] -= x_min
         points[:, 1] -= y_min
-        points[:, 2] = 0.505 - points[:, 2]        
+        points[:, 2] = 0.505 - points[:, 2]
+
+        self.points = points[:, 2].copy()
+
+        if self.init_flag == 0:
+            
+            points[points[:, 2] <= 0.05] = 0
+
+            self.init_flag = 1
+
+            print(self.init_flag)
 
         # Update min, max
         self.x_min, self.x_max = np.min(points[:, 0]), np.max(points[:, 0])
@@ -89,6 +98,9 @@ class Palletizing:
 
         self.vis_depth_map = self.before_depth_map.copy()
 
+        np.printoptions(threshold=np.inf)
+
+
     def make_after_depth_map(self, len1, len2, offset_y):
         start_time = time.time()
         
@@ -102,7 +114,7 @@ class Palletizing:
         h, w = depth_map.shape
         min_height = float('inf')
         std_map = np.ones((h-len1, w-len2))
-        
+
         # Find plane with size of object
         for i in range (h - len1):
             
@@ -114,7 +126,7 @@ class Palletizing:
                 if len(np.unique(tmp_map)) == 1:
                     find_flag = True
                     
-                    if depth_map[i, j] <= min_height:
+                    if depth_map[i, j] < min_height:
                         min_height = depth_map[i, j]
                         self.min_idx = (i, j)
                         self.place_h = depth_map[i, j]
@@ -129,39 +141,51 @@ class Palletizing:
                     if len(np.unique(tmp_map)) == 1:
                         find_rotate_flag = True
                         
-                        if depth_map[i, j] <= min_height:
-                            min_height = depth_map[i, j]
+                        if depth_map[i, j] < min_height:
+                            min_height = min(self.points)
                             self.min_idx = (i, j)
                             self.place_h = depth_map[i, j]        
         
+        print(self.before_depth_map[i, j])
+        print("$$$$$$")
+        print(depth_map[i, j])
+        print("@@@@@@@@@@22")
+        print(min_height)
+
         # Not found
         if not find_flag and not find_rotate_flag:
             min_std_idx = np.argmin(std_map)
             self.min_idx = np.unravel_index(min_std_idx, std_map.shape)          
-            print('perfect plane is not found, alternative position find')        
+            print('perfect plane is not found, alternative position find')      
+
 
         if find_rotate_flag:
             depth_map[self.min_idx[0]:self.min_idx[0]+len2, self.min_idx[1]:self.min_idx[1]+len1] += self.h_max
-            self.after_depth_map = depth_map
+            self.after_depth_map = depth_map.copy()
         else:
             depth_map[self.min_idx[0]:self.min_idx[0]+len1, self.min_idx[1]:self.min_idx[1]+len2] += self.h_max
-            self.after_depth_map = depth_map
+            self.after_depth_map = depth_map.copy()
+
 
         end_time = time.time()
         print(self.min_idx)
-        print(f"Calculate time : {end_time - start_time} seconds")        
-        
-        x_min = -0.213
-        y_min = -0.148
+        print(f"Calculate time : {end_time - start_time} seconds")
+
+        offset_y += 0.0
+        temp_offset_x = 10.0
+               
+        x_hc = 80.59
+        y_hc = 309.16
 
         if find_rotate_flag:
-            rel_x = x_min * 1000.0 + (i + len1 / 2.0) * 10.0 - offset_y * 1000.0
-            rel_y = y_min * 1000.0 + (j + len2 / 2.0) * 10.0
+            abs_x = x_hc - (self.min_idx[1] + len1 / 2.0) * 10.0 + offset_y * 1000.0 
+            abs_y = y_hc + (self.min_idx[0] + len2 / 2.0) * 10.0 
         else:
-            rel_x = x_min * 1000.0 + (i + len2 / 2.0) * 10.0
-            rel_y = y_min * 1000.0 + (j + len1 / 2.0) * 10.0 - offset_y * 1000.0        
+            abs_x = x_hc - (self.min_idx[1] + len2 / 2.0) * 10.0 + temp_offset_x
+            abs_y = y_hc + (self.min_idx[0] + len1 / 2.0) * 10.0 + offset_y * 1000.0
 
-        return rel_x, rel_y, find_rotate_flag
+        print("ROTATE FLAG :", find_rotate_flag)
+        return abs_x, abs_y, find_rotate_flag
 
     def visualization_depth_map(self, flag):
             
@@ -249,7 +273,7 @@ class Palletizing:
 
         # Display the image
         cv2.imshow("Depth Maps", stacked_image)
-        cv2.moveWindow("Depth Maps", 0, 0)        
+        cv2.moveWindow("Depth Maps", 0, 0)
 
         key = cv2.waitKey(0)
         if key & 0xFF == ord('q') or key == 27:
@@ -261,7 +285,11 @@ class Palletizing:
         # list_from_fixed_cam = [grasped obj weight]
         
         # set zero point
-        
+        ## list_from_robot_cam 은 1차원  
+        if not isinstance(list_from_robot_cam, np.ndarray):
+            list_from_robot_cam = np.asanyarray(list_from_robot_cam)
+            print("1111111")
+        print(list_from_robot_cam)
         list_from_robot_cam[:, 0] -= -26
         list_from_robot_cam[:, 1] -= -16
 

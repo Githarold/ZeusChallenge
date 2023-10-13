@@ -77,7 +77,7 @@ class YoloDetector:
                 plot_one_box(xyxy, im0, label=label, color=(255, 0, 0), line_thickness=3)
         
         # Display the image with detections in a separate thread
-        threading.Thread(target=self.display_image, args=(im0,)).start()
+        # threading.Thread(target=self.display_image, args=(im0,)).start()
 
         return np.array(detected_objects)
     
@@ -85,10 +85,11 @@ class YoloDetector:
     def detect_obj_list(self, color_frame):
 
         flag = 0
-        detected_classes = []
+        detected_classes = [] 
         # Check if the frame is a NumPy array, if not, convert it
         if not isinstance(color_frame, np.ndarray):
             color_frame = np.asanyarray(color_frame.get_data())
+
         
         # Use the provided RGB frame for detection
         im0 = color_frame.copy()  # Copy to avoid modifying the original frame
@@ -97,12 +98,15 @@ class YoloDetector:
         if self.half:
             img = img.half()
 
+
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
+
 
         # Inference
         pred = self.model(img)[0]
         pred = non_max_suppression(pred)
+
 
         # Process detections
         if len(pred[0]):
@@ -115,6 +119,8 @@ class YoloDetector:
                 # detected_classes[int(cls)] = detected_classes.get(int(cls), 0) + 1
                 weight = self.class2weight(int(cls))
                 detected_classes.append(weight)
+
+
         
         # Display the image with detections in a separate thread
         threading.Thread(target=self.display_image, args=(im0,)).start()
@@ -127,12 +133,14 @@ class YoloDetector:
         cv2.waitKey(5000)  # Wait for 5 seconds
         cv2.destroyAllWindows()
     
-    def class2weight(self, cls):
-        # water = 0, jelly = 1, cho mil = 2, ramen = 3, tissue = 4, ace = 5, spam = 6, milk_tea = 
+    def class2weight(self, cls): # [[1]]
         # jelly = 0, milk_tea = 1, tissue = 2, cup_ramen = 3, spam = 4, choco_milk = 5, ace = 6
+        print("obj list1")
+
         if cls in [1, 2, 3, 4]:
             weight = 2
         else:
             weight = 1
+        print("obj list2")
             
         return weight

@@ -64,6 +64,9 @@ class UOSRobotics:
                     #########################
             # Yolo detect to know object is exist
             detected_obj_list, yolo_flag = self.yolo.detect_obj_list(color_frame)
+            print("yolo detected")
+            print(detected_obj_list)
+            
             
             if any_flag * yolo_flag == 0:
                 self.miss_stack += 1
@@ -114,25 +117,34 @@ class UOSRobotics:
                 # Move to fixed camera
                 self.zeus.move_pose_estimation()
                             
+
+                            
                 # Object 2D pose, shape detect
+                print("debug : cam")
                 depth_frame, color_frame, _ = self.camera2.get_frame()
                 detected_obj_list, yolo_flag = self.yolo.detect_obj_list(color_frame)
 
                 # Use YOLO, Check object. If there's not object, Move to first place
+                print("debug : yolo flag")
                 if yolo_flag == 0:
                     print("NO OBJECT DETECTED")
                     self.zeus.gripper_open()
                     continue
+                print("debug : yolo flag")
             ###############################################################################################################################
             # Make weight map
-            self.pack.make_weight_map(detected_obj_property, detected_obj_list)
+            print(detected_obj_property, detected_obj_list)
+            
+            # self.pack.make_weight_map(detected_obj_property, detected_obj_list)
+            # print("debug : weight map")
 
             # Change object orientation
             obj_pcd = self.camera2.get_pcd(depth_frame, color_frame, flag = 'object')
             self.object.estimate_plane(obj_pcd)
             self.object.estimate_pose()
+            ##############debug
             rx, ry, rz = self.object.compute_euler_difference()
-            self.object.visualization()
+            # self.object.visualization()
             self.zeus.move_only_orientation(0.0, 0.0, ry)
             angle = self.object.check_theta()
 
@@ -142,7 +154,7 @@ class UOSRobotics:
                 self.object.estimate_plane(obj_pcd)
                 self.object.estimate_pose()
                 rz, ry, rx = self.object.compute_euler_difference()
-                self.object.visualization()
+                # self.object.visualization()
                 self.zeus.move_only_orientation(0.0, 0.0, ry)
 
 
@@ -150,10 +162,11 @@ class UOSRobotics:
             
 
             len1, len2, offset_y = self.object.estimate_length()
-            
+            print(len1, len2)
             # Make depth map & visualization
-            rel_x, rel_y, rotate_flag = self.pack.make_after_depth_map(len1, len2, offset_y)
-            abs_x, abs_y = self.zeus.depth_pos_to_abs(rel_x, rel_y)
+            abs_x, abs_y, rotate_flag = self.pack.make_after_depth_map(len1, len2, offset_y)
+
+            print("x, y, offset :", abs_x, abs_y, offset_y)
 
             # self.pack.visualization_depth_map(flag = 1)
             # self.pack.visualization_opencv(flag = 1)
@@ -163,8 +176,13 @@ class UOSRobotics:
             ###################################################################################################
             self.zeus.move_pose_estimation()
             print(f"after object pose {object_pose}")
+
+            if rotate_flag:
+                object_pose[3] -= 90
+
             self.zeus.move([abs_x, abs_y, 332.80, object_pose[3], object_pose[4], object_pose[5]])
-            self.zeus.place(-50.0)
+            ## need to change 
+            self.zeus.place(-150.0)
             ###################################################################################################            
             
             # Move to above the box
